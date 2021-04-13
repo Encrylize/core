@@ -4451,6 +4451,8 @@ static void node_loader_impl_destroy_prepare_cb(uv_prepare_t *handle)
 {
 	loader_impl_node node_impl = container_of(handle, struct loader_impl_node_type, destroy_prepare);
 
+	node_loader_impl_print_handles(node_impl);
+
 	if (node_loader_impl_user_async_handles_count(node_impl) <= 0)
 	{
 		node_impl->event_loop_empty.store(true);
@@ -4471,6 +4473,8 @@ void node_loader_impl_destroy_safe(napi_env env, loader_impl_async_destroy_safe 
 	status = napi_open_handle_scope(env, &handle_scope);
 
 	node_loader_impl_exception(env, status);
+
+	node_loader_impl_print_handles(node_impl);
 
 	/* Check if there are async handles, destroy if the queue is empty, otherwise request the destroy */
 	if (node_loader_impl_user_async_handles_count(node_impl) <= 0 || node_impl->event_loop_empty.load() == true)
@@ -4493,6 +4497,16 @@ void node_loader_impl_destroy_safe(napi_env env, loader_impl_async_destroy_safe 
 void node_loader_impl_walk_async_handles_count(uv_handle_t *handle, void *arg)
 {
 	int64_t *async_count = static_cast<int64_t *>(arg);
+
+	if (handle->type == UV_SIGNAL)
+	{
+		uv_signal_t *signal = (uv_signal_t *)handle;
+
+		if (signal->signum == SIGWINCH)
+		{
+			return;
+		}
+	}
 
 	if (uv_is_active(handle) != 0)
 	{
